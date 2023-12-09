@@ -15,6 +15,18 @@ module.exports = (sequelize, DataTypes) => {
     },
     importe: {
       type: DataTypes.DECIMAL(10, 2)
+    },
+    estado: {
+      type: DataTypes.ENUM,
+      values: ['Pendiente', 'Confirmado', 'Cancelado', 'En Progreso', 'Preparado', 'En Transito', 'Entregado']
+    },
+    fechaConfirmado: {
+      type: DataTypes.DATE,
+      allowNull: true // Puede ser nulo hasta que el estado sea 'Confirmado'
+    },
+    fechaEnTransito: {
+      type: DataTypes.DATE,
+      allowNull: true // Puede ser nulo hasta que el estado sea 'En Transito'
     }
   }, {
     tableName: 'Ordenes'
