@@ -1,0 +1,31 @@
+{
+   "test": {
+     "username": "jorge",
+     "password": "admin123",
+     "database": "elecciones",
+     "host": "127.0.0.1",
+     "dialect": "postgres",
+     "port" : 5432
+   },
+   "development": {
+     "username": "rgbsystemsrl",
+     "password": "HxOPwEX53LjR",
+     "database": "neondb",
+     "host": "ep-snowy-lake-86262853.us-east-2.aws.neon.tech",
+     "dialect": "postgres",
+     "dialectOptions": {
+       "ssl": {
+         "require": true,
+         "rejectUnauthorized": false
+       }
+     }
+   },
+   "production": {
+     "username": "root",
+     "password": null,
+     "database": "database_production",
+     "host": "127.0.0.1",
+     "dialect": "postgres"
+   }
+ }
+ 
