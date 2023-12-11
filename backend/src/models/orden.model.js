@@ -34,8 +34,10 @@ module.exports = (sequelize, DataTypes) => {
 
   Orden.associate = function(models) {
     Orden.hasMany(models.LineaOrden, {
+      as: 'lineasOrden',
       foreignKey: 'ordenId',
-      as: 'lineasOrden'
+      onDelete: 'CASCADE',
+      hooks: true
     });
   };
 
