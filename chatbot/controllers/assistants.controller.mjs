@@ -1,4 +1,4 @@
-import db from "./../models/index.mjs";
+import db from "../models/index.mjs";
 const UserThread = db.sequelize.models.UserThread;
 
 const UserThreadController = {
