@@ -1,6 +1,5 @@
 import WhatsAppWeb from 'whatsapp-web.js';
 import qrcode from 'qrcode-terminal';
-import { transcribeAudioStream, translateAudioStream, chatCompletion } from './transcription.mjs';
 import { config } from 'dotenv';
 import fs from 'fs';
 import streamifier from 'streamifier';
@@ -39,4 +38,6 @@ client.on('message', message => {
 
 
 // Inicia la sesión de WhatsApp
-client.initialize();
+//client.initialize();
+
+export { client };
