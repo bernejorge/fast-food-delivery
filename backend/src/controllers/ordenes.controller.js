@@ -70,23 +70,42 @@ const ordenesController = {
   },
   agregarLineasOrden: async (req, res) => {
     try {
-      const ordenId = req.params.id; // El ID de la orden se obtiene del parámetro de la ruta
+      const ordenId = req.body.id; // El ID de la orden se obtiene del cuerpo de la solicitud
       const lineas = req.body.lineas; // Array de líneas de orden desde el cuerpo de la solicitud
-
-      const orden = await Orden.findByPk(ordenId);
+  
+      // Obtener la orden existente
+      let orden = await Orden.findByPk(ordenId, { include: ['lineasOrden'] });
       if (!orden) {
-        return res.status(404).json({ message: "Orden no encontrada." });
+        return res.status(404).json({ message: 'Orden no encontrada.' });
       }
-
+  
+      // Calcular el nuevo importe total
+      let importeAdicional = 0;
+      for (const linea of lineas) {
+        const producto = await Producto.findByPk(linea.id_producto_ordenado);
+        if (!producto) {
+          return res.status(404).json({ message: 'Producto no encontrado.' });
+        }
+        importeAdicional += producto.precio * linea.cantidad;
+      }
+  
+      // Actualizar el importe total de la orden
+      orden.importe += importeAdicional;
+      await orden.save();
+  
+      // Añadir nuevas líneas de orden
       for (const linea of lineas) {
         await LineaOrden.create({ ...linea, ordenId: ordenId });
       }
-
-      res.status(200).json({ message: "Líneas de orden agregadas con éxito" });
+  
+      // Recuperar la orden actualizada con todas sus líneas de orden
+      orden = await Orden.findByPk(ordenId, { include: ['lineasOrden'] });
+      res.json(orden);
     } catch (error) {
       res.status(500).json({ error: error.message });
     }
   },
+  
   eliminarLineaOrden: async (req, res) => {
     try {
       const { ordenId, lineaOrdenId } = req.params; // Asume que ambos ID vienen como parámetros de ruta
