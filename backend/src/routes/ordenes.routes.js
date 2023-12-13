@@ -11,4 +11,10 @@ router.delete('/orden/:ordenId/linea/:lineaOrdenId', ordenesController.eliminarL
 
 router.get('/:id', ordenesController.getById);
 
+router.post('/confirmar', ordenesController.confirmarOrden);
+
+router.post('/quitarProductosOrdenados', ordenesController.restarProductosOrdenados);
+router.get('/buscarOrdenesPorTelefonoNoFinalizadas/:telefono', ordenesController.buscarOrdenesPorTelefonoNoFinalizadas);
+router.post('/buscarOrdenes', ordenesController.buscarOrdenes);
+
 module.exports = router;
