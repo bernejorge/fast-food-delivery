@@ -37,13 +37,16 @@ const UserThreadController = {
   },
   getThreadByPhoneNumber: async (phoneNumber) => {
     try {
+      if (!phoneNumber) return null;
       const thread = await UserThread.findOne({
         where: { telefono: phoneNumber },
       });
       return thread;
     } catch (error) {
       console.error("Error al buscar UserThread por teléfono:", error);
-      throw error;
+      throw  error;
     }
   },
 };
+
+export default UserThreadController;

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import functions_to_call from "./functions.mjs";
 
 class ClientConversation {
   constructor(wa_number, assistant_id, thread, openAIInstance, assistant) {
@@ -77,10 +78,18 @@ class ClientConversation {
   async sendMessage(message) {
     try {
       const openai = new OpenAI();
-      const msg = await openai.beta.threads.messages.create(this.thread.id, {
-        role: "user",
-        content: message,
-      });
+      try {
+        const msg = await openai.beta.threads.messages.create(this.thread.id, {
+          role: "user",
+          content: message,
+        });
+      } catch (error) {
+        const runs = await openai.beta.threads.runs.list(this.thread.id);
+        for (const run of runs) {
+          await openai.beta.threads.runs.cancel(this.thread.id, run.id);
+        }
+      }
+     
 
       const run = await openai.beta.threads.runs.create(this.thread.id, {
         assistant_id: this.assistant.id,
@@ -99,10 +108,7 @@ class ClientConversation {
       ) {
         if (actualRun.status === "requires_action") {
           try {
-            const availableFunctions = {
-              get_products_with_price: getPriceList,
-              get_Business_Hours: getBusinessHours,
-            }; // only one function in this example, but you can have multiple
+            const availableFunctions = functions_to_call; // only one function in this example, but you can have multiple
 
             const toolCalls =
               actualRun.required_action?.submit_tool_outputs?.tool_calls;
@@ -113,12 +119,13 @@ class ClientConversation {
               const args = JSON.parse(toolCall?.function?.arguments || "{}");
               try {
                 //try to execute the function required by the assistance
-                const functionResponse = functionToCall(args);
+                args.telefono = this.wa_number;
+                const functionResponse = await functionToCall(args);
 
                 //storage the response
                 toolOutputs.push({
                   tool_call_id: toolCall?.id,
-                  output: JSON.stringify(functionResponse),
+                  output:  JSON.stringify(functionResponse),
                 });
               } catch (error) {
                 toolOutputs.push({
@@ -164,6 +171,7 @@ class ClientConversation {
       return "Lo siento no pude recuperar tu respuesta."; 
 
     } catch (error) {
+      
       throw error;
     }
   }

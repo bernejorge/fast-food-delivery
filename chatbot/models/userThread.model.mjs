@@ -1,6 +1,6 @@
 export default (sequelize, DataTypes) => {
    const UserThread = sequelize.define('UserThread', {
-     telfono: {
+     telefono: {
        type: DataTypes.STRING,
        primaryKey: true,
      },
