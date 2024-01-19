@@ -54,7 +54,18 @@ const ordenesController = {
 
       // Obtener la orden completa con líneas de orden para la respuesta
       const ordenCompleta = await Orden.findByPk(nuevaOrden.id, {
-        include: ["lineasOrden"],
+        include: [
+          {
+            model: LineaOrden,
+            as: "lineasOrden",
+            include: [
+              {
+                model: Producto,
+                as: "producto", // Asegúrate de que 'producto' sea el alias correcto en tu asociación
+              },
+            ],
+          },
+        ],
         transaction,
       });
 
@@ -68,40 +79,82 @@ const ordenesController = {
       res.status(500).json({ error: error.message });
     }
   },
-  agregarLineasOrden: async (req, res) => {
+  eliminarOrden: async (req, res) =>{
     try {
-      const ordenId = req.body.id; // El ID de la orden se obtiene del cuerpo de la solicitud
-      const lineas = req.body.lineas; // Array de líneas de orden desde el cuerpo de la solicitud
+      transaction = await db.sequelize.transaction();
+      const { ordenId } = req.params;
 
-      // Obtener la orden existente
-      let orden = await Orden.findByPk(ordenId, { include: ["lineasOrden"] });
+      // Recuperar la orden
+      const orden = await Orden.findByPk(ordenId, { transaction });
       if (!orden) {
+        await transaction.rollback();
         return res.status(404).json({ message: "Orden no encontrada." });
       }
 
-      // Calcular el nuevo importe total
-      let importeAdicional = 0;
-      for (const linea of lineas) {
-        const producto = await Producto.findByPk(linea.id_producto_ordenado);
-        if (!producto) {
-          return res.status(404).json({ message: "Producto no encontrado." });
-        }
-        importeAdicional += producto.precio * linea.cantidad;
-      }
+      await orden.destroy({ transaction });
+      await transaction.commit();
 
-      // Actualizar el importe total de la orden
-      orden.importe += importeAdicional;
-      await orden.save();
+      return res.status(200).json({ message: "Orden eliminada" }); 
 
-      // Añadir nuevas líneas de orden
-      for (const linea of lineas) {
-        await LineaOrden.create({ ...linea, ordenId: ordenId });
-      }
-
-      // Recuperar la orden actualizada con todas sus líneas de orden
-      orden = await Orden.findByPk(ordenId, { include: ["lineasOrden"] });
-      res.json(orden);
     } catch (error) {
+      await transaction.rollback();
+      res.status(500).json({ error: error.message });
+    }
+  },
+  agregarLineasOrden: async (req, res) => {
+    let transaction;
+    try {
+      transaction = await db.sequelize.transaction();
+      const { id, lineas } = req.body;
+
+      // Recuperar la orden
+      const orden = await Orden.findByPk(id, { transaction });
+      if (!orden) {
+        await transaction.rollback();
+        return res.status(404).json({ message: "Orden no encontrada." });
+      }
+
+      // Agregar o actualizar líneas de orden
+      for (const nuevaLinea of lineas) {
+        const [lineaOrden, created] = await LineaOrden.findOrCreate({
+          where: {
+            ordenId: orden.id,
+            id_producto_ordenado: nuevaLinea.id_producto_ordenado,
+          },
+          defaults: { ...nuevaLinea, ordenId: orden.id },
+          transaction,
+        });
+
+        if (!created) {
+          lineaOrden.cantidad += nuevaLinea.cantidad;
+          await lineaOrden.save({ transaction });
+        }
+      }
+      const ordenActualizada = await Orden.findByPk(id, {
+        include: [
+          {
+            model: LineaOrden,
+            as: "lineasOrden",
+            include: [
+              {
+                model: Producto,
+                as: "producto", // Asegúrate de que 'producto' sea el alias correcto en tu asociación
+              },
+            ],
+          },
+        ],
+        transaction,
+      });
+
+      
+      // Recalcular el importe
+      ordenActualizada.importe = await recalcularImporte(ordenActualizada);
+      await ordenActualizada.save({ transaction });
+
+      await transaction.commit();
+      res.json(ordenActualizada);
+    } catch (error) {
+      if (transaction) await transaction.rollback();
       res.status(500).json({ error: error.message });
     }
   },
@@ -109,34 +162,38 @@ const ordenesController = {
     let transaction;
     try {
       transaction = await db.sequelize.transaction();
-  
+
       const { ordenId, id_producto_ordenado, cantidadARestar } = req.body;
-  
+
       // Recuperar la orden
       const orden = await Orden.findByPk(ordenId, {
-        include: ['lineasOrden'],
-        transaction
+        include: ["lineasOrden"],
+        transaction,
       });
-  
+
       if (!orden) {
         await transaction.rollback();
         return res.status(404).json({ message: "Orden no encontrada." });
       }
-  
+
       // Buscar la línea de orden que contenga el producto
-      const lineaOrden = orden.lineasOrden.find(linea => linea.id_producto_ordenado === id_producto_ordenado);
+      const lineaOrden = orden.lineasOrden.find(
+        (linea) => linea.id_producto_ordenado === id_producto_ordenado
+      );
       if (!lineaOrden) {
         await transaction.rollback();
-        return res.status(404).json({ message: "Línea de orden no encontrada para el producto." });
+        return res
+          .status(404)
+          .json({ message: "Línea de orden no encontrada para el producto." });
       }
-  
+
       if (cantidadARestar >= lineaOrden.cantidad) {
         // Eliminar la línea de orden si la cantidad a restar es mayor o igual
         await lineaOrden.destroy({ transaction });
         // Recargar la orden para actualizar las líneas de orden en memoria
         const ordenActualizada = await Orden.findByPk(ordenId, {
-          include: ['lineasOrden'],
-          transaction
+          include: ["lineasOrden"],
+          transaction,
         });
         orden.lineasOrden = ordenActualizada.lineasOrden;
       } else {
@@ -144,12 +201,12 @@ const ordenesController = {
         lineaOrden.cantidad -= cantidadARestar;
         await lineaOrden.save({ transaction });
       }
-  
+
       // Recalcular y actualizar el importe total de la orden
       // La función recalcularImporte debe estar definida para calcular correctamente el importe
       orden.importe = await recalcularImporte(orden);
       await orden.save({ transaction });
-  
+
       await transaction.commit();
       res.json(orden);
     } catch (error) {
@@ -279,40 +336,55 @@ const ordenesController = {
     try {
       transaction = await db.sequelize.transaction();
       const { ordenId } = req.body;
-  
+
       const orden = await Orden.findByPk(ordenId, { transaction });
       if (!orden) {
         await transaction.rollback();
-        return res.status(404).json({ message: 'Orden no encontrada.' });
+        return res.status(404).json({ message: "Orden no encontrada." });
       }
-  
-      if (orden.estado !== 'Pendiente') {
+
+      if (orden.estado !== "Pendiente") {
         await transaction.rollback();
-        return res.status(400).json({ message: 'Solo se pueden confirmar órdenes en estado Pendiente.' });
+        return res
+          .status(400)
+          .json({
+            message: "Solo se pueden confirmar órdenes en estado Pendiente.",
+          });
       }
-  
-      orden.estado = 'Confirmado';
+
+      orden.estado = "Confirmado";
+      orden.fechaConfirmado = new Date();
       await orden.save({ transaction });
-  
-      const userThread = await db.UserThread.findOne({ where: { telefono: orden.telefono }, transaction });
+
+      const userThread = await db.UserThread.findOne({
+        where: { telefono: orden.telefono },
+        transaction,
+      });
       if (userThread) {
         userThread.thread_id = null; // o db.NULL si es necesario
         await userThread.save({ transaction });
       }
-  
+
       const ordenActualizada = await Orden.findByPk(ordenId, {
-        include: ['lineasOrden'], // Incluye detalles adicionales si es necesario
-        transaction
+        include: ["lineasOrden"], // Incluye detalles adicionales si es necesario
+        transaction,
       });
-    
+
       await transaction.commit();
-      res.json(ordenActualizada);
-      
+
+      const eta = await TiempoEstimadoPreparacion();
+
+      const data = {
+        orden : ordenActualizada,
+        tiempo_estimado_entrega: eta == 0 ? 'as soon as possible' : eta + ' minutes',
+      }
+
+      res.json(data);
     } catch (error) {
       if (transaction) await transaction.rollback();
       res.status(500).json({ error: error.message });
     }
-  }
+  },
 
   // Agregar otros métodos CRUD según sea necesario
 };
@@ -326,6 +398,39 @@ async function recalcularImporte(orden) {
   }
 
   return importeTotal;
+}
+
+async function TiempoEstimadoPreparacion() {
+  const fechaHoy = new Date();
+  fechaHoy.setHours(0, 0, 0, 0); // Establece la fecha al inicio del día
+
+  const ordenes = await Orden.findAll({
+    where: {
+      estado: {
+        [db.Sequelize.Op.or]: ['En Transito', 'Entregado']
+      },
+      fechaConfirmado: {
+        [db.Sequelize.Op.gte]: fechaHoy
+      },
+      fechaEnTransito: {
+        [db.Sequelize.Op.ne]: null
+      }
+    },
+    order: [['fechaConfirmado', 'DESC']],
+    limit: 100
+  });
+
+  let sumaDiferencias = 0;
+  let contadorOrdenes = 0;
+
+  ordenes.forEach(orden => {
+    if (orden.fechaConfirmado && orden.fechaEnTransito) {
+      sumaDiferencias += (orden.fechaEnTransito - orden.fechaConfirmado);
+      contadorOrdenes++;
+    }
+  });
+
+  return contadorOrdenes > 0 ? (sumaDiferencias / contadorOrdenes) / 1000 / 60 : 0; // Retorna el promedio en minutos
 }
 
 module.exports = ordenesController;

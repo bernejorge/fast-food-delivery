@@ -9,6 +9,8 @@ router.post('/agregar-lineas', ordenesController.agregarLineasOrden);
 
 router.delete('/orden/:ordenId/linea/:lineaOrdenId', ordenesController.eliminarLineaOrden);
 
+router.delete('/:ordenId', ordenesController.eliminarOrden);
+
 router.get('/:id', ordenesController.getById);
 
 router.post('/confirmar', ordenesController.confirmarOrden);

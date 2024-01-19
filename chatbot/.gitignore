@@ -98,6 +98,8 @@ uploads/
 node_modules/
 jspm_packages/
 
+images/
+
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
 

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import functions_to_call from "./functions.mjs";
+//import functions_to_call from "./../../Tipsy/functions.mjs";
 
 class ClientConversation {
   constructor(wa_number, assistant_id, thread, openAIInstance, assistant) {
@@ -12,8 +13,14 @@ class ClientConversation {
 
   static async create(wa_number, assistant_id, thread_id, openAIInstance) {
     try {
-      const assistant = await ClientConversation.retrieveAssistant(openAIInstance, assistant_id);
-      const thread = await ClientConversation.retrieveThread(openAIInstance, thread_id);
+      const assistant = await ClientConversation.retrieveAssistant(
+        openAIInstance,
+        assistant_id
+      );
+      const thread = await ClientConversation.retrieveThread(
+        openAIInstance,
+        thread_id
+      );
       return new ClientConversation(
         wa_number,
         assistant_id,
@@ -24,7 +31,6 @@ class ClientConversation {
     } catch (error) {
       throw new Error(error.message);
     }
-   
   }
 
   //metodo para recupera el assistant por id
@@ -50,27 +56,45 @@ class ClientConversation {
   //metodo para recuperar el hilo (thread) de la conersacion
   static async retrieveThread(OpenAI, id) {
     try {
-      //const openai = new OpenAI();
+      //const OpenAI = openai;
       let thread;
       if (id) {
         try {
           thread = await OpenAI.beta.threads.retrieve(id);
         } catch (error) {
-          if(error.message.includes("No thread found")) {
+          if (error.message.includes("No thread found")) {
             thread = await OpenAI.beta.threads.create();
             return thread;
-          }    
+          }
         }
         if (!thread) {
           //create a new thread
           thread = await OpenAI.beta.threads.create();
+        } else {
+          //si ya tenia un hilo, buscar el mensaje mas nuevo.
+          //si el mensaje tiene mas de 4 horas crear un nuevo hilo
+          const threadMessages = await OpenAI.beta.threads.messages.list(
+            thread.id,
+            {
+              order: "desc",
+            }
+          );
+          if (threadMessages.data.length > 0) {
+            const last_timestamp = threadMessages.data[0].created_at * 1000; // timestamp en milisec
+            const now = Date.now();
+            // Calcular la diferencia en horas
+            const difference = (now - last_timestamp) / (1000 * 60 * 60);
+            // Comprobar si la diferencia es mayor que 4 horas
+            if (difference > 4) {
+              thread = await OpenAI.beta.threads.create();
+            }
+          }
         }
       } else {
         thread = await OpenAI.beta.threads.create();
       }
       return thread;
     } catch (error) {
-      
       throw error;
     }
   }
@@ -79,17 +103,35 @@ class ClientConversation {
     try {
       const openai = new OpenAI();
       try {
+        //verificar que no existan ejecuciones del thread
+        let filteredRuns;
+        do {
+          const runs = await openai.beta.threads.runs.list(this.thread.id, {
+            order: "desc",
+          });
+  
+          filteredRuns = runs.data.filter(
+            (run) =>
+              run.status === "queued" ||
+              run.status === "in_progress" ||
+              run.status === "requires_action"
+          );
+        } while (filteredRuns.length > 0);    
+
         const msg = await openai.beta.threads.messages.create(this.thread.id, {
           role: "user",
           content: message,
+          //file_ids: ['file-Tj9NzH5yMJUTcFTPpqws8UWX'],
         });
       } catch (error) {
         const runs = await openai.beta.threads.runs.list(this.thread.id);
-        for (const run of runs) {
-          await openai.beta.threads.runs.cancel(this.thread.id, run.id);
+        for (let i = 0; i < runs.data.length; i++) {
+          await openai.beta.threads.runs.cancel(
+            this.thread.id,
+            runs.data[i].id
+          );
         }
       }
-     
 
       const run = await openai.beta.threads.runs.create(this.thread.id, {
         assistant_id: this.assistant.id,
@@ -108,7 +150,7 @@ class ClientConversation {
       ) {
         if (actualRun.status === "requires_action") {
           try {
-            const availableFunctions = functions_to_call; // only one function in this example, but you can have multiple
+            const availableFunctions = functions_to_call; // have multiple
 
             const toolCalls =
               actualRun.required_action?.submit_tool_outputs?.tool_calls;
@@ -125,7 +167,7 @@ class ClientConversation {
                 //storage the response
                 toolOutputs.push({
                   tool_call_id: toolCall?.id,
-                  output:  JSON.stringify(functionResponse),
+                  output: JSON.stringify(functionResponse),
                 });
               } catch (error) {
                 toolOutputs.push({
@@ -144,12 +186,18 @@ class ClientConversation {
               }
             );
           } catch (error) {
-            actualRun = await openai.beta.threads.runs.cancel(this.thread.id, run.id);
+            actualRun = await openai.beta.threads.runs.cancel(
+              this.thread.id,
+              run.id
+            );
             throw error;
           }
         }
         await new Promise((resolve) => setTimeout(resolve, 2000));
-        actualRun = await openai.beta.threads.runs.retrieve(this.thread.id, run.id);
+        actualRun = await openai.beta.threads.runs.retrieve(
+          this.thread.id,
+          run.id
+        );
       }
 
       // Get the last assistant message from the messages array
@@ -167,11 +215,9 @@ class ClientConversation {
         console.log(`${lastMessageForRun.content[0].text.value} \n`);
         return `${lastMessageForRun.content[0].text.value} \n`;
       }
-      
-      return "Lo siento no pude recuperar tu respuesta."; 
 
+      return "Lo siento no pude recuperar tu respuesta.";
     } catch (error) {
-      
       throw error;
     }
   }

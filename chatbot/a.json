@@ -1,0 +1,113 @@
+{
+   "name": "asignar_turno",
+   "description": "Asigna el turno al paciente",
+   "parameters": {
+     "type": "object",
+     "properties": {
+       "id_turno": {
+         "type": "integer",
+         "description": "Id del turno seleccionado por el paciente"
+       },
+       "id_prestacion": {
+         "type": "integer",
+         "description": "Id del prestacion"
+       },
+       "id_coberntura":{
+         "type": "integer",
+         "description": "Id de la cobertura seleccionado por el paciente"
+       }
+     },
+     "required": [
+       ""
+     ]
+   }
+ }
+
+
+{
+   "name": "obtener_primeros_turnos",
+   "description": "Obtiene los primeros turnos disponibles para el profesional, servicio, prestacion e institucion seleccionados.",
+   "parameters": {
+      "type": "object",
+      "properties": {
+         "id_profesional": {
+            "type": "integer",
+            "description": "Id del profesional"
+         },
+         "id_servicio": {
+            "type": "integer",
+            "description": "Id del servicio"
+         },
+         "id_prestacion": {
+            "type": "integer",
+            "description": "Id prestacion"
+         },
+         "id_institucion": {
+            "type": "integer",
+            "description": "Id institucion"
+         },
+         "id_coberntura": {
+            "type": "integer",
+            "description": "Id de la coberntura elegida por el paciente"
+         }
+      },
+      "required": [
+         "id_profesional",
+         "id_servicio",
+         "id_prestacion",
+         "id_institucion",
+         "id_coberntura"
+      ]
+   }
+}
+
+{
+   "name": "obtener_instituciones_para_servicio_profesional_prestacion",
+   "description": "Obtiene las instituciones medicas donde el profesional atiende la prestracion del servicio seleccionado",
+   "parameters": {
+      "type": "object",
+      "properties": {
+         "id_profesional": {
+            "type": "integer",
+            "description": "Id del profesional"
+         },
+         "id_servicio": {
+            "type": "integer",
+            "description": "Id del servicio"
+         },
+         "id_prestacion": {
+            "type": "integer",
+            "description": "Id prestacion"
+         }
+      },
+      "required": [
+         "id_profesional",
+         "id_servicio",
+         "id_prestacion"
+      ]
+   }
+}
+
+
+
+{
+   "name": "obtener_prestaciones_para_servicio_profesional",
+   "description": "Obtiene las prestaciones que ofrece el profesional en el servicio",
+   "parameters": {
+      "type": "object",
+      "properties": {
+         "id_profesional": {
+            "type": "integer",
+            "description": "Id del profesional"
+         },
+         "id_servicio": {
+            "type": "integer",
+            "description": "Id del servicio"
+         }
+      },
+      "required": [
+         "id_profesional",
+         "id_servicio"
+      ]
+   }
+}
